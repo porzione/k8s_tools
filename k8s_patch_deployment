@@ -38,7 +38,12 @@ class PatchK8S
   end
 
   def parse(yml)
-    data = YAML.safe_load(File.read(yml))
+    raw = if File.exist?(yml)
+            File.read yml
+          else
+            cmd "kubectl get deployment #{yml} -o yaml"
+          end
+    data = YAML.safe_load raw
     abort 'Bad yaml' unless data.key?('kind')
     abort "Bad kind: #{data['kind']}" unless data['kind'] == 'Deployment'
     abort('there must be only one container') unless data['spec']['template']['spec']['containers'].size == 1
