@@ -12,16 +12,15 @@ class PatchK8S
   def initialize
     @opt = OpenStruct.new
     OptionParser.new do |opts|
-      opts.on('--image IMG', 'Image url') { |i| @opt.img = i }
-      opts.on('--dry', 'Dry run')         { @opt.dry = true }
-      opts.on('-D', 'Debug')              { @opt.debug = true }
-      opts.on('-V', 'Verbose')            { @opt.verbose = true }
+      opts.on('-i IMG', 'Image url') { |i| @opt.img = i }
+      opts.on('--dry', 'Dry run')    { @opt.dry = true }
+      opts.on('-D', 'Debug')         { @opt.debug = true }
     end.parse!
-    abort 'give me some yamls' if (@ymls = ARGV).empty?
+    abort 'give me deployment(s) file|name' if (@ymls = ARGV).empty?
   end
 
   def cmd(command)
-    puts command if @opt.debug
+    warn command if @opt.debug
     out, err, st = Open3.capture3 command
     abort "#{out} #{err} #{st.to_i}" unless st.success?
     warn err if err&.size&.positive?
@@ -32,7 +31,7 @@ class PatchK8S
     @ymls.each do |yml|
       data = parse yml
       img = @opt.img || fetch_img(data)
-      puts "image: #{img}" if @opt.debug
+      warn "image: #{img}" if @opt.debug
       apply(data, img)
     end
   end
@@ -47,6 +46,8 @@ class PatchK8S
     abort 'Bad yaml' unless data.key?('kind')
     abort "Bad kind: #{data['kind']}" unless data['kind'] == 'Deployment'
     abort('there must be only one container') unless data['spec']['template']['spec']['containers'].size == 1
+    data.delete 'status'
+    warn data if @opt.debug
     data
   end
 
@@ -61,10 +62,11 @@ class PatchK8S
 
   def apply(data, img)
     data['spec']['template']['spec']['containers'][0]['image'] = img
+    data['metadata']['annotations']['patchTimestamp'] = Time.now.utc.strftime('%FT%T%:z')
     dry_run = @opt.dry ? 'server' : 'none'
     cmd = "kubectl apply --dry-run='#{dry_run}' -f -"
     yml = YAML.dump data
-    puts "YAML:\n#{yml}" if @opt.verbose
+    warn "YAML:\n#{yml}" if @opt.debug
     out, err, st = Open3.capture3 cmd, stdin_data: yml
     if st.success?
       puts out
