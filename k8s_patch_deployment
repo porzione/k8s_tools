@@ -55,13 +55,14 @@ class PatchK8S
     yml = cmd format(
       'kubectl get deployment %<name>s -o yaml -n %<ns>s',
       name: data['metadata']['name'],
-      ns:   data['metadata']['namespace']
+      ns:   data['metadata']['namespace'] || 'default'
     )
     YAML.safe_load(yml)['spec']['template']['spec']['containers'][0]['image']
   end
 
   def apply(data, img)
     data['spec']['template']['spec']['containers'][0]['image'] = img
+    data['metadata']['annotations'] ||= {}
     data['metadata']['annotations']['patchTimestamp'] = Time.now.utc.strftime('%FT%T%:z')
     dry_run = @opt.dry ? 'server' : 'none'
     cmd = "kubectl apply --dry-run='#{dry_run}' -f -"
