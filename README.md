@@ -4,10 +4,6 @@
 
 `k8s_edit_secret -s mysecret`
 
-`k8s_view_secrets` - just print secret to stdout.
-
-`k8s_view_secrets` mysecret
-
 `k8s_patch_deployment` - patch deployment(s) from yaml without changing container image.
 
 `k8s_patch_deployment deployment-1.yaml deployment-2.yaml`
